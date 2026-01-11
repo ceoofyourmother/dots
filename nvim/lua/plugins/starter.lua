@@ -1,0 +1,116 @@
+return {
+    {
+        "echasnovski/mini.starter",
+        dependencies = {
+            "mini.sessions"
+        },
+        event = "VimEnter",
+        opts = function()
+            
+            local function generateRandomBlocks(rows, cols)
+                local result = {}
+                for i = 1, rows do
+                    local line = ""
+                    for j = 1, cols do
+                        if math.random() < 0.5 then
+                            line = line .. "⬤ "
+                        else
+                            line = line .. "  "              
+                        end
+                    end
+                    table.insert(result, line)
+                end
+                return result
+            end
+
+            local rows = 15
+            local cols = 28
+
+            math.randomseed(os.time())
+            local blocks = generateRandomBlocks(rows, cols) 
+
+            local logo = table.concat(blocks, "\n")
+            local new_section = function(name, action, section)
+                return { name = name, action = action, section = section }
+            end
+
+            local starter = require("mini.starter")
+            local config = {
+                evaluate_single = true,
+                header = logo,
+                items = {
+                    starter.sections.sessions(20, true),
+                    new_section(
+                        "Find file",
+                        function()
+                            require("fff").find_files()
+                        end,
+                        "Finder"
+                    ),
+                    new_section(
+                        "Grep file",
+                        function()
+                            require("fzf-lua").live_grep()
+                        end,
+                        "Finder"
+                    ),
+
+                    new_section("init.lua", "e $MYVIMRC", "Config"),
+                    new_section("Lazy", "Lazy", "Config"),
+
+                    new_section("New file", "ene | startinsert", "Built-in"),
+                    new_section("Quit", "qa", "Built-in"),
+                },
+                content_hooks = {
+                    starter.gen_hook.adding_bullet("░ ", false),
+                    starter.gen_hook.aligning("center", "center")
+                }
+            }
+            return config
+        end,
+        config = function(_, config)
+            -- close Lazy and re-open when starter is ready
+            if vim.o.filetype == "lazy" then
+                vim.cmd.close()
+                vim.api.nvim_create_autocmd("User", {
+                    pattern = "MiniStarterOpened",
+                    callback = function()
+                        require("lazy").show()
+                    end,
+                })
+            end
+
+            local starter = require("mini.starter")
+            starter.setup(config)
+
+            vim.api.nvim_create_autocmd("User", {
+                pattern = "LazyVimStarted",
+                callback = function()
+                    local stats = require("lazy").stats()
+                    local ms = (math.floor(stats.startuptime * 100 + 0.5) / 100)
+                    local pad_footer = string.rep(" ", 8)
+                    starter.config.footer = pad_footer ..
+                        "⚡ Neovim loaded " .. stats.count .. " plugins in " .. ms .. "ms"
+                    pcall(starter.refresh)
+                end,
+            })
+        end,
+    },
+    {
+        "echasnovski/mini.sessions",
+        version = false,
+        opts = {
+            -- Whether to read latest session if Neovim opened without file arguments
+            autoread = true,
+            -- Whether to write current session before quitting Neovim
+            autowrite = true,
+            -- Directory where global sessions are stored (use `''` to disable)
+            directory = '~/.vim/sessions', --<"session" subdir of user data directory from |stdpath()|>,
+            -- File for local session (use `''` to disable)
+            file = ''                      -- 'Session.vim',
+        },
+        config = function(opts, _)
+            require("mini.sessions").setup(opts)
+        end
+    },
+}
